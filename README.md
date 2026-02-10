@@ -1,6 +1,13 @@
 # PR-Agent
 
+[![Build & Push Docker](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml)
+[![Docker Hub](https://img.shields.io/docker/v/yashasviudayan/pr-agent?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/yashasviudayan/pr-agent)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 An autonomous repo-maintainer that listens for GitHub issues and automatically generates code fixes, commits them, and opens pull requests — powered by a local LLM via [Ollama](https://ollama.com).
+
+---
 
 ## How It Works
 
@@ -28,16 +35,22 @@ GitHub Issue Opened
 5. The agent reads the file, asks Ollama to generate a fix, and writes it back.
 6. The agent commits the change, pushes a new branch, and opens a PR via the GitHub CLI.
 
+---
+
 ## Prerequisites
 
-- **Python 3.10+**
-- **[Ollama](https://ollama.com)** installed and running locally
-- **[GitHub CLI (`gh`)](https://cli.github.com)** authenticated (`gh auth login`)
-- **[ngrok](https://ngrok.com)** (free tier) for exposing the local server to GitHub
+| Dependency | Purpose |
+|---|---|
+| [Python 3.10+](https://www.python.org) | Runtime |
+| [Ollama](https://ollama.com) | Local LLM inference |
+| [GitHub CLI (`gh`)](https://cli.github.com) | PR creation & auth |
+| [ngrok](https://ngrok.com) | Expose local server to GitHub |
 
-## Setup
+---
 
-### 1. Clone and install dependencies
+## Quick Start
+
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/yashasviudayan-py/PR-Agent.git
@@ -45,19 +58,14 @@ cd PR-Agent
 pip install -r requirements.txt
 ```
 
-### 2. Pull the Ollama model
+### 2. Pull the model and start Ollama
 
 ```bash
 ollama pull llama3.1:8b-instruct-q8_0
-```
-
-### 3. Start Ollama
-
-```bash
 ollama serve
 ```
 
-### 4. Start the listener
+### 3. Start the listener
 
 ```bash
 python listener.py
@@ -65,7 +73,7 @@ python listener.py
 
 You should see: `INFO: Uvicorn running on http://0.0.0.0:8000`
 
-### 5. Expose with ngrok
+### 4. Expose with ngrok
 
 In a separate terminal:
 
@@ -75,7 +83,7 @@ ngrok http 8000
 
 Copy the `Forwarding` URL (e.g., `https://abc123.ngrok-free.app`).
 
-### 6. Configure the GitHub webhook
+### 5. Configure the GitHub webhook
 
 1. Go to your repository on GitHub.
 2. Navigate to **Settings > Webhooks > Add webhook**.
@@ -83,6 +91,26 @@ Copy the `Forwarding` URL (e.g., `https://abc123.ngrok-free.app`).
 4. **Content type:** `application/json`
 5. **Events:** Select "Let me select individual events" and check **Issues**.
 6. Click **Add webhook**.
+
+---
+
+## Docker
+
+Pull the pre-built image from Docker Hub:
+
+```bash
+docker pull yashasviudayan/pr-agent:latest
+```
+
+Or run it directly:
+
+```bash
+docker run -p 8000:8000 yashasviudayan/pr-agent:latest
+```
+
+> **Note:** The container includes Python, git, and GitHub CLI. You still need Ollama running on the host (accessible at `host.docker.internal:11434`).
+
+---
 
 ## Usage
 
@@ -92,18 +120,28 @@ Open an issue on the repository. The agent will automatically:
 2. Generate a code fix using Ollama.
 3. Open a pull request with the changes.
 
+---
+
 ## Project Structure
 
 ```
 .
-├── listener.py        # FastAPI webhook server
-├── agent.py           # Orchestrator: scan → fix → commit → PR
-├── scanner.py         # LLM-powered file identification
-├── requirements.txt   # Python dependencies
-├── .env               # Environment variables (not committed)
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml   # CI/CD: auto-push to Docker Hub
+├── listener.py                  # FastAPI webhook server
+├── agent.py                     # Orchestrator: scan → fix → commit → PR
+├── scanner.py                   # LLM-powered file identification
+├── Dockerfile                   # Container image definition
+├── requirements.txt             # Python dependencies
+├── LICENSE                      # MIT License
+├── .env                         # Environment variables (not committed)
+├── .dockerignore
 └── .gitignore
 ```
 
+---
+
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
