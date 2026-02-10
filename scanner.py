@@ -9,4 +9,12 @@ def find_relevant_file(issue_description):
     prompt = f"Given these files: {files}, which one relates to: '{issue_description}'? Output ONLY the filename."
     response = ollama.chat(model='llama3.1:8b-instruct-q8_0', messages=[{'role': 'user', 'content': prompt}])
     
-    return response['message']['content'].strip()
+    filename = response['message']['content'].strip()
+    
+    if os.path.exists(filename):
+        return filename
+    else:
+        if files:
+            return files[0]
+        else:
+            return None
