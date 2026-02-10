@@ -1,9 +1,9 @@
 # PR-Agent
 
-[![Build & Push Docker](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml)
-[![Docker Hub](https://img.shields.io/docker/v/yashasviudayan/pr-agent?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/yashasviudayan/pr-agent)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/yashasviudayan-py/PR-Agent/actions/workflows/docker-publish.yml)
+[![Docker](https://img.shields.io/badge/Docker%20Hub-pr--agent-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/yashasviudayan/pr-agent)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776ab?logo=python&logoColor=white)](https://www.python.org)
+[![License](https://img.shields.io/github/license/yashasviudayan-py/PR-Agent?color=green)](LICENSE)
 
 An autonomous repo-maintainer that listens for GitHub issues and automatically generates code fixes, commits them, and opens pull requests — powered by a local LLM via [Ollama](https://ollama.com).
 
