@@ -14,6 +14,10 @@ async def handle_github_issue(request: Request):
         print(f"🛠️ New Task: {issue_title}")
         
         # TRIGGER: Call the agent script with the issue details
-        subprocess.Popen(["python", "agent.py", issue_title, issue_body])
+        subprocess.Popen(["python", "agent.py", issue_title, issue_body or ""])
         
     return {"status": "accepted"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
