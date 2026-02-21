@@ -1,7 +1,9 @@
-import sys
+import argparse
 import os
 import re
 import shlex
+import subprocess
+import sys
 import ollama
 from scanner import find_relevant_file
 
@@ -21,7 +23,7 @@ def generate_fix(target_file, title, body):
         f"No markdown fences, no explanation, no commentary — just the raw code."
     )
 
-    print(f"🤖 Generating fix for {target_file}...")
+    print(f"Generating fix for {target_file}...")
     response = ollama.chat(
         model="llama3.1:8b-instruct-q8_0",
         messages=[{"role": "user", "content": prompt}],
@@ -35,32 +37,158 @@ def generate_fix(target_file, title, body):
     with open(target_file, "w") as f:
         f.write(fixed_code + "\n")
 
-    print(f"✅ Fix written to {target_file}")
+    print(f"Fix written to {target_file}")
 
-def run_agent(title, body):
-    # 1. Identify the file locally
+def _run_cmd(cmd, check=True):
+    """Run a shell command, capturing output. Returns (returncode, stdout, stderr)."""
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    if check and result.returncode != 0:
+        print(f"Command failed: {cmd}")
+        print(f"   stderr: {result.stderr.strip()}")
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+def run_generate(title, body):
+    """Phase 1: Find file, create branch, generate fix, output diff (no commit)."""
     target_file = find_relevant_file(title)
     if not target_file:
-        print("❌ No target file found. Aborting.")
-        return
-    print(f"🔍 Scanner identified: {target_file}")
+        print("No target file found. Aborting.")
+        sys.exit(1)
+    print(f"Scanner identified: {target_file}")
 
-    # 2. Create a new branch using GH CLI
     branch_name = f"fix-{target_file.split('.')[0]}"
-    os.system(f"git checkout -b {shlex.quote(branch_name)}")
+    rc, _, err = _run_cmd(f"git checkout -b {shlex.quote(branch_name)}")
+    if rc != 0:
+        print(f"Failed to create branch {branch_name}: {err}")
+        sys.exit(1)
+    print(f"Branch created: {branch_name}")
 
-    # 3. Generate the fix with Ollama
     generate_fix(target_file, title, body)
 
-    # 4. Push and Open PR via GH CLI
+    # Output diff (unstaged changes)
+    rc, diff_output, _ = _run_cmd(f"git diff -- {shlex.quote(target_file)}", check=False)
+
+    print(f"TARGET_FILE: {target_file}")
+    print(f"BRANCH: {branch_name}")
+    print("DIFF_START")
+    print(diff_output)
+    print("DIFF_END")
+    print(f"FILES_CHANGED: {target_file}")
+
+
+def run_commit(title, body, branch_name, target_file):
+    """Phase 2: Stage, commit, push, and create PR on an existing branch."""
+    # Ensure we're on the right branch
+    rc, current_branch, _ = _run_cmd("git branch --show-current", check=False)
+    if current_branch != branch_name:
+        rc, _, err = _run_cmd(f"git checkout {shlex.quote(branch_name)}")
+        if rc != 0:
+            print(f"Failed to checkout branch {branch_name}: {err}")
+            sys.exit(1)
+
     safe_title = shlex.quote(f"AI Refactor: {title}")
     safe_body = shlex.quote(body or "")
-    os.system(f"git add {shlex.quote(target_file)}")
-    os.system(f"git commit -m {safe_title}")
-    os.system(f"git push origin {shlex.quote(branch_name)}")
 
-    os.system(f"gh pr create --title {shlex.quote(title)} --body {safe_body}")
-    print(f"🚀 Pull Request Created for {target_file}!")
+    rc, _, err = _run_cmd(f"git add {shlex.quote(target_file)}")
+    if rc != 0:
+        print(f"git add failed: {err}")
+        sys.exit(1)
+
+    rc, _, err = _run_cmd(f"git commit -m {safe_title}")
+    if rc != 0:
+        print(f"git commit failed: {err}")
+        sys.exit(1)
+    print("Changes committed")
+
+    rc, _, err = _run_cmd(f"git push origin {shlex.quote(branch_name)}")
+    if rc != 0:
+        print(f"git push failed: {err}")
+        sys.exit(1)
+    print(f"Pushed to origin/{branch_name}")
+
+    rc, pr_url, err = _run_cmd(
+        f"gh pr create --title {shlex.quote(title)} --body {safe_body}"
+    )
+    if rc != 0:
+        print(f"gh pr create failed: {err}")
+        sys.exit(1)
+
+    print(f"PR_URL: {pr_url}")
+    print(f"FILES_CHANGED: {target_file}")
+    print(f"BRANCH: {branch_name}")
+    print(f"Pull Request Created for {target_file}!")
+
+
+def run_agent(title, body):
+    """Full mode: find file, create branch, generate fix, commit, push, create PR."""
+    target_file = find_relevant_file(title)
+    if not target_file:
+        print("No target file found. Aborting.")
+        sys.exit(1)
+    print(f"Scanner identified: {target_file}")
+
+    branch_name = f"fix-{target_file.split('.')[0]}"
+    rc, _, err = _run_cmd(f"git checkout -b {shlex.quote(branch_name)}")
+    if rc != 0:
+        print(f"Failed to create branch {branch_name}: {err}")
+        sys.exit(1)
+    print(f"Branch created: {branch_name}")
+
+    generate_fix(target_file, title, body)
+
+    safe_title = shlex.quote(f"AI Refactor: {title}")
+    safe_body = shlex.quote(body or "")
+
+    rc, _, err = _run_cmd(f"git add {shlex.quote(target_file)}")
+    if rc != 0:
+        print(f"git add failed: {err}")
+        sys.exit(1)
+
+    rc, _, err = _run_cmd(f"git commit -m {safe_title}")
+    if rc != 0:
+        print(f"git commit failed: {err}")
+        sys.exit(1)
+    print("Changes committed")
+
+    rc, _, err = _run_cmd(f"git push origin {shlex.quote(branch_name)}")
+    if rc != 0:
+        print(f"git push failed: {err}")
+        sys.exit(1)
+    print(f"Pushed to origin/{branch_name}")
+
+    rc, pr_url, err = _run_cmd(
+        f"gh pr create --title {shlex.quote(title)} --body {safe_body}"
+    )
+    if rc != 0:
+        print(f"gh pr create failed: {err}")
+        sys.exit(1)
+
+    print(f"PR_URL: {pr_url}")
+    print(f"FILES_CHANGED: {target_file}")
+    print(f"BRANCH: {branch_name}")
+    print(f"Pull Request Created for {target_file}!")
+
 
 if __name__ == "__main__":
-    run_agent(sys.argv[1], sys.argv[2])
+    parser = argparse.ArgumentParser(description="PR-Agent: AI-powered code fixes")
+    parser.add_argument("title", help="Issue/PR title")
+    parser.add_argument("body", nargs="?", default="", help="Issue/PR body")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "generate", "commit"],
+        default="full",
+        help="Execution mode: full (default), generate (preview only), commit (finalize)",
+    )
+    parser.add_argument("--branch", help="Branch name (required for commit mode)")
+    parser.add_argument("--file", help="Target file (required for commit mode)")
+
+    args = parser.parse_args()
+
+    if args.mode == "generate":
+        run_generate(args.title, args.body)
+    elif args.mode == "commit":
+        if not args.branch or not args.file:
+            parser.error("--branch and --file are required for commit mode")
+        run_commit(args.title, args.body, args.branch, args.file)
+    else:
+        run_agent(args.title, args.body)
